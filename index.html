@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Siniestralidad Vial - Zona Metropolitana de Mérida</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+
+<style>
+
+html, body{
+    margin:0;
+    padding:0;
+    height:100%;
+    font-family:"Segoe UI", Arial, sans-serif;
+}
+
+#map{
+    width:100%;
+    height:100vh;
+}
+
+.map-title{
+    position:absolute;
+    top:12px;
+    left:60px;
+    z-index:1000;
+    background:rgba(255,255,255,.96);
+    padding:14px 18px;
+    border-radius:10px;
+    box-shadow:0 3px 12px rgba(0,0,0,.18);
+}
+
+.map-title h1{
+    margin:0;
+    font-size:20px;
+    color:#1f2937;
+}
+
+.map-title p{
+    margin:4px 0 0;
+    color:#6b7280;
+    font-size:13px;
+}
+
+.leaflet-popup-content{
+    margin:14px;
+    min-width:280px;
+}
+
+.popup-title{
+    margin:0 0 10px 0;
+    font-size:16px;
+    font-weight:700;
+    color:#1f2937;
+}
+
+.alert-card{
+    border-radius:10px;
+    padding:12px;
+    margin-bottom:14px;
+    text-align:center;
+    color:#fff;
+}
+
+.alert-label{
+    font-size:12px;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    opacity:.9;
+}
+
+.alert-value{
+    font-size:20px;
+    font-weight:700;
+    margin-top:5px;
+}
+
+.popup-table{
+    width:100%;
+    border-collapse:collapse;
+}
+
+.popup-table thead th{
+    background:#f3f4f6;
+    padding:10px;
+    text-align:left;
+    font-size:12px;
+}
+
+.popup-table tbody td{
+    border-bottom:1px solid #e5e7eb;
+    padding:10px;
+    font-size:13px;
+}
+
+.popup-table .val{
+    text-align:right;
+    font-weight:600;
+}
+
+.legend{
+    background:rgba(255,255,255,.96);
+    padding:14px;
+    border-radius:10px;
+    box-shadow:0 3px 12px rgba(0,0,0,.18);
+    min-width:220px;
+    line-height:22px;
+}
+
+.legend h4{
+    margin:0 0 12px;
+    font-size:15px;
+}
+
+.legend-section{
+    margin-bottom:14px;
+}
+
+.legend-section-title{
+    font-weight:700;
+    margin-bottom:8px;
+}
+
+.legend-item{
+    display:flex;
+    align-items:center;
+    margin-bottom:6px;
+}
+
+.legend-color{
+    width:18px;
+    height:18px;
+    border:1px solid #999;
+    margin-right:8px;
+    flex-shrink:0;
+}
+
+.leaflet-control-layers{
+    max-height:400px;
+    overflow-y:auto;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="map-title">
+    <h1>Siniestralidad Vial</h1>
+    <p>Zona Metropolitana de Mérida, Yucatán</p>
+</div>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+<script>
+
+const map = L.map('map', {
+    preferCanvas:true
+}).setView([20.97,-89.62],11);
+
+// MAPAS BASE
+
+const osm = L.tileLayer(
+    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    { attribution:'&copy; OpenStreetMap' }
+).addTo(map);
+
+const carto = L.tileLayer(
+    'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+    { attribution:'&copy; CARTO' }
+);
+
+const esri = L.tileLayer(
+    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    { attribution:'Tiles &copy; Esri' }
+);
+
+const baseMaps = {
+    "OpenStreetMap": osm,
+    "Claro": carto,
+    "Satélite": esri
+};
+
+// COLORES
+
+const coloresRiesgoAcc = {
+    "MUY BAJO":"#E8EBA1",
+    "BAJO":"#F3D36A",
+    "MODERADO":"#F79A43",
+    "ALTO":"#FF2600",
+    "MUY ALTO":"#D10B00",
+    "SIN RIESGO":"#F2F2F2"
+};
+
+const coloresVialidades = {
+    "ALTO":"#191738",
+    "MODERADO":"#8A2D6E",
+    "BAJO":"#F2A79D",
+    "SIN RIESGO":"#D9D9D9"
+};
+
+const coloresAccidentes = {
+    1:"#D7191C",
+    2:"#27AE60",
+    3:"#F1C40F"
+};
+
+function nombreAccidente(valor){
+
+    switch(Number(valor)){
+        case 1: return "FATAL";
+        case 2: return "NO FATAL";
+        case 3: return "HERIDOS";
+        default: return "SIN CLASIFICAR";
+    }
+}
+
+function formatoNumero(valor, decimales=2){
+
+    return Number(valor).toLocaleString('es-MX',{
+        minimumFractionDigits:decimales,
+        maximumFractionDigits:decimales
+    });
+}
+
+const overlays = {};
+const grupoGeneral = L.featureGroup().addTo(map);
+
+const clusterAccidentes = L.markerClusterGroup({
+    disableClusteringAtZoom:15,
+    showCoverageOnHover:false
+});
+
+// RIESGO ACCIDENTES
+
+fetch('./geojson/Riesgo_accidentes_ZMM.geojson')
+.then(r => r.json())
+.then(data => {
+
+    const capa = L.geoJSON(data, {
+
+        style: feature => ({
+            color:'#8A8A8A',
+            weight:0.8,
+            opacity:0.8,
+            fillColor:coloresRiesgoAcc[feature.properties.Cat_riesgo] || '#CCC',
+            fillOpacity:0.65
+        }),
+
+        onEachFeature:(feature, layer) => {
+
+            const p = feature.properties;
+
+            layer.bindPopup(`
+
+                <div class="popup-title">
+                    ${p.nom_asen || 'Colonia sin nombre'}
+                </div>
+
+                <div class="alert-card"
+                     style="background:${coloresRiesgoAcc[p.Cat_riesgo] || '#6B7280'};">
+
+                    <div class="alert-label">
+                        Diagnóstico de Riesgo Vial
+                    </div>
+
+                    <div class="alert-value">
+                        ${p.Cat_riesgo}
+                    </div>
+
+                </div>
+
+                <table class="popup-table">
+
+                    <thead>
+                        <tr>
+                            <th>Indicador de Siniestralidad</th>
+                            <th style="text-align:right;">Valor</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+
+                        <tr>
+                            <td>Índice de Riesgo (Indice_R)</td>
+                            <td class="val">
+                                ${formatoNumero(p.Indice_R)}
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <td>Conteo de Accidentes</td>
+                            <td class="val" style="font-weight:700;">
+                                ${p.CLASE_coun}
+                            </td>
+                        </tr>
+
+                    </tbody>
+
+                </table>
+
+            `);
+        }
+
+    });
+
+    overlays["Riesgo de accidentes"] = capa;
+
+    capa.addTo(map);
+    grupoGeneral.addLayer(capa);
+
+    actualizarControl();
+    ajustarVista();
+
+})
+.catch(error => console.error(error));
+
+// ACCIDENTES
+
+fetch('./geojson/Accidentes_ZMM.geojson')
+.then(r => r.json())
+.then(data => {
+
+    const capa = L.geoJSON(data, {
+
+        pointToLayer:(feature, latlng) => L.circleMarker(latlng, {
+
+            radius:5,
+            fillColor:coloresAccidentes[feature.properties.CLASE],
+            color:'#FFFFFF',
+            weight:1,
+            fillOpacity:0.85
+
+        }),
+
+        onEachFeature:(feature, layer) => {
+
+            layer.bindPopup(`
+                <b>Tipo de accidente:</b><br>
+                ${nombreAccidente(feature.properties.CLASE)}
+            `);
+        }
+
+    });
+
+    clusterAccidentes.addLayer(capa);
+
+    overlays["Accidentes"] = clusterAccidentes;
+
+    map.addLayer(clusterAccidentes);
+
+    grupoGeneral.addLayer(capa);
+
+    actualizarControl();
+    ajustarVista();
+
+})
+.catch(error => console.error(error));
+
+// RIESGO VIALIDADES
+
+fetch('./geojson/Riesgo_vialidades_ZMM.geojson')
+.then(r => r.json())
+.then(data => {
+
+    const capa = L.geoJSON(data, {
+
+        style: feature => ({
+            color:coloresVialidades[feature.properties.Riesgo_via] || '#999',
+            weight:3,
+            opacity:0.9
+        }),
+
+        onEachFeature:(feature, layer) => {
+
+            layer.bindPopup(`
+                <b>Riesgo vial:</b><br>
+                ${feature.properties.Riesgo_via}
+            `);
+        }
+
+    });
+
+    overlays["Riesgo de vialidades"] = capa;
+
+    capa.addTo(map);
+
+    grupoGeneral.addLayer(capa);
+
+    actualizarControl();
+    ajustarVista();
+
+})
+.catch(error => console.error(error));
+
+// CONTROL CAPAS
+
+let controlCapas = L.control.layers(
+    baseMaps,
+    overlays,
+    {collapsed:false}
+).addTo(map);
+
+function actualizarControl(){
+
+    map.removeControl(controlCapas);
+
+    controlCapas = L.control.layers(
+        baseMaps,
+        overlays,
+        {collapsed:false}
+    ).addTo(map);
+}
+
+function ajustarVista(){
+
+    if(grupoGeneral.getLayers().length > 0){
+
+        map.fitBounds(grupoGeneral.getBounds(),{
+            padding:[30,30]
+        });
+    }
+}
+
+// ESCALA
+
+L.control.scale({
+    metric:true,
+    imperial:false
+}).addTo(map);
+
+// LEYENDA
+
+const legend = L.control({position:'bottomright'});
+
+legend.onAdd = function(){
+
+    const div = L.DomUtil.create('div','legend');
+
+    div.innerHTML = `
+
+        <h4>Simbología</h4>
+
+        <div class="legend-section">
+
+            <div class="legend-section-title">
+                Riesgo_vialidades_ZMM
+            </div>
+
+            <div class="legend-item">
+                <svg width="32" height="14" style="margin-right:10px;">
+                    <path d="M1 7 C6 2, 12 12, 18 7 S24 2, 31 7"
+                        stroke="#191738"
+                        stroke-width="4"
+                        fill="none"
+                        stroke-linecap="round"/>
+                </svg>
+                ALTO
+            </div>
+
+            <div class="legend-item">
+                <svg width="32" height="14" style="margin-right:10px;">
+                    <path d="M1 7 C6 2, 12 12, 18 7 S24 2, 31 7"
+                        stroke="#8A2D6E"
+                        stroke-width="4"
+                        fill="none"
+                        stroke-linecap="round"/>
+                </svg>
+                MODERADO
+            </div>
+
+            <div class="legend-item">
+                <svg width="32" height="14" style="margin-right:10px;">
+                    <path d="M1 7 C6 2, 12 12, 18 7 S24 2, 31 7"
+                        stroke="#F2A79D"
+                        stroke-width="4"
+                        fill="none"
+                        stroke-linecap="round"/>
+                </svg>
+                BAJO
+            </div>
+
+            <div class="legend-item">
+                <svg width="32" height="14" style="margin-right:10px;">
+                    <path d="M1 7 C6 2, 12 12, 18 7 S24 2, 31 7"
+                        stroke="#D9D9D9"
+                        stroke-width="4"
+                        fill="none"
+                        stroke-linecap="round"/>
+                </svg>
+                SIN RIESGO
+            </div>
+
+        </div>
+
+        <div class="legend-section">
+
+            <div class="legend-section-title">
+                Accidentes_ZMM
+            </div>
+
+            <div class="legend-item">
+                <span style="
+                    width:14px;
+                    height:14px;
+                    background:#D7191C;
+                    transform:rotate(45deg);
+                    display:inline-block;
+                    margin-right:12px;
+                    border:1px solid rgba(0,0,0,.2);">
+                </span>
+                FATAL
+            </div>
+
+            <div class="legend-item">
+                <span style="
+                    width:14px;
+                    height:14px;
+                    background:#27AE60;
+                    transform:rotate(45deg);
+                    display:inline-block;
+                    margin-right:12px;
+                    border:1px solid rgba(0,0,0,.2);">
+                </span>
+                NO FATAL
+            </div>
+
+            <div class="legend-item">
+                <span style="
+                    width:14px;
+                    height:14px;
+                    background:#F1C40F;
+                    transform:rotate(45deg);
+                    display:inline-block;
+                    margin-right:12px;
+                    border:1px solid rgba(0,0,0,.2);">
+                </span>
+                HERIDOS
+            </div>
+
+        </div>
+
+        <div class="legend-section">
+
+            <div class="legend-section-title">
+                Riesgo de accidentes
+            </div>
+
+            <div class="legend-item">
+                <span class="legend-color" style="background:#E8EBA1;"></span>
+                MUY BAJO
+            </div>
+
+            <div class="legend-item">
+                <span class="legend-color" style="background:#F3D36A;"></span>
+                BAJO
+            </div>
+
+            <div class="legend-item">
+                <span class="legend-color" style="background:#F79A43;"></span>
+                MODERADO
+            </div>
+
+            <div class="legend-item">
+                <span class="legend-color" style="background:#FF2600;"></span>
+                ALTO
+            </div>
+
+            <div class="legend-item">
+                <span class="legend-color" style="background:#D10B00;"></span>
+                MUY ALTO
+            </div>
+
+            <div class="legend-item">
+                <span class="legend-color" style="background:#F2F2F2;"></span>
+                SIN RIESGO
+            </div>
+
+        </div>
+
+    `;
+
+    return div;
+};
+
+legend.addTo(map);
+
+</script>
+
+</body>
+</html>
