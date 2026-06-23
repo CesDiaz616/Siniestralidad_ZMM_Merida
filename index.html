@@ -190,7 +190,7 @@ html, body {
     .map-title p { font-size: 11px; }
     .leaflet-control-layers { max-width: 220px; max-height: 65vh; }
     .leaflet-popup-content { width: 180px !important; }
-    .metadata-box { display: none; } /* Ocultar en móviles para evitar saturar pantalla */
+    .metadata-box { display: block; max-width: 85%; } /* Ocultar en móviles para evitar saturar pantalla */
 }
 
 </style>
@@ -204,7 +204,7 @@ html, body {
 </div>
 
 <div class="metadata-box">
-    <details open>
+    <details>
         <summary>Fuentes e Información Técnica</summary>
         <ul>
             <li><strong>Siniestros:</strong> INEGI (2024). Accidentes de Tránsito Terrestre en Zonas Urbanas y Suburbanas (ATUS). Base georreferenciada municipal.</li>
