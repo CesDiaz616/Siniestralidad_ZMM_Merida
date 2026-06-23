@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Siniestralidad Vial - Zona Metropolitana de Mérida</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css">
+
+<style>
+
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    font-family: "Segoe UI", Arial, sans-serif;
+}
+
+#map {
+    width: 100%;
+    height: 100vh;
+}
+
+/* TÍTULO INGENIERÍA VIAL */
+.map-title {
+    position: absolute;
+    top: 12px;
+    left: 55px;
+    z-index: 1000;
+    background: rgba(255,255,255,0.95);
+    padding: 12px 16px;
+    border-radius: 10px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.18);
+    max-width: 380px;
+}
+
+.map-title h1 {
+    margin: 0;
+    font-size: 19px;
+    color: #1f2937;
+}
+
+.map-title p {
+    margin: 4px 0 0;
+    font-size: 12px;
+    color: #6b7280;
+}
+
+/* PANEL DE FUENTES DE INFORMACIÓN TÉCNICA */
+.metadata-box {
+    position: absolute;
+    bottom: 25px;
+    left: 15px;
+    z-index: 1000;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 10px 14px;
+    border-radius: 8px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.18);
+    max-width: 320px;
+    font-size: 11px;
+    color: #374151;
+    border-left: 4px solid #191738;
+}
+
+.metadata-box details summary {
+    font-weight: 700;
+    cursor: pointer;
+    outline: none;
+    font-size: 12px;
+    color: #1f2937;
+}
+
+.metadata-box ul {
+    margin: 6px 0 0 0;
+    padding-left: 14px;
+}
+
+.metadata-box li {
+    margin-bottom: 4px;
+}
+
+/* PANEL DE CAPAS */
+.leaflet-control-layers {
+    max-width: 260px;
+    max-height: 75vh;
+    overflow-y: auto;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.18);
+}
+
+.leaflet-control-layers-expanded {
+    padding: 12px;
+}
+
+/* LEYENDA INTEGRADA */
+.legend-inline {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #d1d5db;
+}
+
+.legend-title {
+    font-size: 12px;
+    font-weight: 700;
+    margin: 12px 0 8px;
+    color: #1f2937;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    font-size: 12px;
+    margin-bottom: 7px;
+}
+
+.legend-color {
+    width: 16px;
+    height: 16px;
+    border: 1px solid #999;
+    margin-right: 8px;
+    flex-shrink: 0;
+}
+
+.legend-diamond {
+    width: 12px;
+    height: 12px;
+    transform: rotate(45deg);
+    margin: 0 10px 0 2px;
+    border: 1px solid rgba(0,0,0,0.2);
+    flex-shrink: 0;
+}
+
+.legend-svg {
+    margin-right: 8px;
+    flex-shrink: 0;
+}
+
+/* POPUPS */
+.leaflet-popup-content {
+    width: 220px !important;
+    margin: 10px !important;
+}
+
+.alert-card {
+    border-radius: 8px;
+    padding: 8px;
+    text-align: center;
+    margin-bottom: 8px;
+}
+
+.alert-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.alert-value {
+    font-size: 14px;
+    margin-top: 4px;
+}
+
+.popup-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+}
+
+.popup-table th,
+.popup-table td {
+    padding: 6px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.popup-table .val {
+    text-align: right;
+    font-weight: 700;
+}
+
+/* RESPONSIVO */
+@media (max-width: 768px) {
+    .map-title {
+        top: 10px;
+        left: 50px;
+        max-width: 60%;
+        padding: 8px 12px;
+    }
+    .map-title h1 { font-size: 15px; }
+    .map-title p { font-size: 11px; }
+    .leaflet-control-layers { max-width: 220px; max-height: 65vh; }
+    .leaflet-popup-content { width: 180px !important; }
+    .metadata-box { display: none; } /* Ocultar en móviles para evitar saturar pantalla */
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="map-title">
+    <h1>Siniestralidad Vial</h1>
+    <p>Zona Metropolitana de Mérida, Yucatán</p>
+</div>
+
+<div class="metadata-box">
+    <details open>
+        <summary>Fuentes e Información Técnica</summary>
+        <ul>
+            <li><strong>Siniestros:</strong> INEGI (2024). Accidentes de Tránsito Terrestre en Zonas Urbanas y Suburbanas (ATUS). Base georreferenciada municipal.</li>
+            <li><strong>Colonias:</strong> INEGI (2025). Delimitación de colonias y otros asentamientos humanos (DCAH).</li>
+            <li><strong>Vialidades:</strong> INEGI (2025). Red Nacional de Caminos (RNC).</li>
+            <li><strong>Actualización del visor:</strong> Junio 2026.</li>
+        </ul>
+    </details>
+</div>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+
+<script>
+
+const esMovil = window.innerWidth <= 768;
+
+const map = L.map('map', {
+    preferCanvas: true
+}).setView([20.97, -89.62], 11);
+
+/* MAPAS BASE */
+const osm = L.tileLayer(
+    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    { attribution: '&copy; OpenStreetMap' }
+).addTo(map);
+
+const claro = L.tileLayer(
+    'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+    { attribution: '&copy; CARTO' }
+);
+
+const satelite = L.tileLayer(
+    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    { attribution: '&copy; Esri' }
+);
+
+const baseMaps = {
+    "OpenStreetMap": osm,
+    "Claro": claro,
+    "Satélite": satelite
+};
+
+/* PALETAS DE COLOR INSTITUCIONALES */
+const coloresRiesgo = {
+    "MUY BAJO": "#E8EBA1",
+    "BAJO": "#F3D36A",
+    "MODERADO": "#F79A43",
+    "ALTO": "#FF2600",
+    "MUY ALTO": "#D10B00",
+    "SIN RIESGO": "#F2F2F2"
+};
+
+const coloresVia = {
+    "ALTO": "#191738",
+    "MODERADO": "#8A2D6E",
+    "BAJO": "#F2A79D",
+    "SIN RIESGO": "#D9D9D9"
+};
+
+const coloresAcc = {
+    1: "#D7191C", // Fatal
+    2: "#27AE60", // No Fatal
+    3: "#F1C40F"  // Solo Heridos
+};
+
+function tipoAccidente(v) {
+    return {
+        1: "FATAL",
+        2: "NO FATAL",
+        3: "HERIDOS"
+    }[Number(v)] || "SIN CLASIFICAR";
+}
+
+function formatoNumero(v) {
+    return Number(v).toLocaleString('es-MX', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+}
+
+const overlays = {};
+const grupoGeneral = L.featureGroup().addTo(map);
+
+// Inicializadores de grupos avanzados
+const clusterAccidentes = L.markerClusterGroup({
+    spiderfyOnMaxZoom: true,
+    showCoverageOnHover: false,
+    zoomToBoundsOnClick: true,
+    maxClusterRadius: 45
+});
+
+const capaHeatmap = L.heatLayer([], {
+    radius: 25,
+    blur: 15,
+    maxZoom: 15,
+    gradient: {0.4: 'blue', 0.6: 'cyan', 0.7: 'lime', 0.8: 'yellow', 1.0: 'red'}
+});
+
+/* CONTROL DE CAPAS NATIVO */
+let controlCapas = L.control.layers(
+    baseMaps,
+    overlays,
+    { collapsed: true, position: 'topright' }
+).addTo(map);
+
+/* INYECCIÓN DE LEYENDA TÉCNICA */
+function insertarLeyenda() {
+    const panel = document.querySelector('.leaflet-control-layers-list');
+    if (!panel || document.getElementById('legend-inline')) return;
+
+    const div = document.createElement('div');
+    div.id = 'legend-inline';
+    div.className = 'legend-inline';
+
+    div.innerHTML = `
+        <div class="legend-title">RIESGO EN VIALIDADES</div>
+        ${crearLinea('#191738','ALTO')}
+        ${crearLinea('#8A2D6E','MODERADO')}
+        ${crearLinea('#F2A79D','BAJO')}
+        ${crearLinea('#D9D9D9','SIN RIESGO')}
+
+        <div class="legend-title">TIPO DE ACCIDENTES</div>
+        ${crearRombo('#D7191C','FATAL')}
+        ${crearRombo('#27AE60','NO FATAL')}
+        ${crearRombo('#F1C40F','HERIDOS')}
+
+        <div class="legend-title">RIESGO DE ACCIDENTES (COLONIAS)</div>
+        ${crearColor('#E8EBA1','MUY BAJO')}
+        ${crearColor('#F3D36A','BAJO')}
+        ${crearColor('#F79A43','MODERADO')}
+        ${crearColor('#FF2600','ALTO')}
+        ${crearColor('#D10B00','MUY ALTO')}
+        ${crearColor('#F2F2F2','SIN RIESGO')}
+    `;
+    panel.appendChild(div);
+}
+
+function actualizarControl() {
+    map.removeControl(controlCapas);
+    controlCapas = L.control.layers(baseMaps, overlays, { collapsed: true, position: 'topright' }).addTo(map);
+
+    setTimeout(() => {
+        insertarLeyenda();
+        if (!esMovil) {
+            const boton = document.querySelector('.leaflet-control-layers-toggle');
+            const expandido = document.querySelector('.leaflet-control-layers-expanded');
+            if (boton && !expandido) { boton.click(); }
+        }
+    }, 100);
+}
+
+function ajustarVista() {
+    if (grupoGeneral.getLayers().length) {
+        map.fitBounds(grupoGeneral.getBounds(), { padding: [30, 30] });
+    }
+}
+
+/* 1. CARGA DE CAPA: RIESGO DE ACCIDENTES (POLÍGONOS POR COLONIA) */
+fetch('./geojson/Riesgo_accidentes_ZMM.geojson')
+.then(r => r.json())
+.then(data => {
+    const capa = L.geoJSON(data, {
+        style: f => ({
+            color: '#8A8A8A',
+            weight: 0.8,
+            fillColor: coloresRiesgo[f.properties.Cat_riesgo] || '#CCC',
+            fillOpacity: 0.65
+        }),
+        onEachFeature: (feature, layer) => {
+            const p = feature.properties;
+            const cat = p.Cat_riesgo ? p.Cat_riesgo.toUpperCase() : "SIN RIESGO";
+            
+            // CONTROL DE ACCESIBILIDAD CRÍTICA: Forzar negro y negrita en categorías de bajo contraste
+            let estiloAlerta = `background:${coloresRiesgo[p.Cat_riesgo] || '#666'}; color: white; font-weight: 500;`;
+            if (cat === "BAJO" || cat === "MUY BAJO" || cat === "SIN RIESGO") {
+                estiloAlerta = `background:${coloresRiesgo[p.Cat_riesgo] || '#F2F2F2'}; color: #000000; font-weight: 700; border: 1px solid #999;`;
+            }
+
+            layer.bindPopup(`
+                <strong>${p.nom_asen || 'Colonia sin nombre'}</strong><br><br>
+                <div class="alert-card" style="${estiloAlerta}">
+                    <div class="alert-label">Diagnóstico de Riesgo Vial</div>
+                    <div class="alert-value">${cat}</div>
+                </div>
+                <table class="popup-table">
+                    <tr>
+                        <td>Índice de Riesgo</td>
+                        <td class="val">${formatoNumero(p.Indice_R)}</td>
+                    </tr>
+                    <tr>
+                        <td>Accidentes Totales</td>
+                        <td class="val">${p.CLASE_coun}</td>
+                    </tr>
+                </table>
+                
+                `);
+        }
+    });
+
+    overlays["Riesgo de accidentes"] = capa;
+    capa.addTo(map);
+    grupoGeneral.addLayer(capa);
+    actualizarControl();
+    ajustarVista();
+});
+
+/* 2. CARGA DE CAPA: ACCIDENTES (PUNTOS CON CLUSTER Y HEATMAP CONVERTIDO DINÁMICAMENTE) */
+fetch('./geojson/Accidentes_ZMM.geojson')
+.then(r => r.json())
+.then(data => {
+    // Array para almacenar los puntos del Heatmap
+    const puntosHeat = [];
+
+    const capaGeoJsonPuntos = L.geoJSON(data, {
+        pointToLayer: (feature, latlng) => {
+            // Llenamos el array para el mapa de calor usando las coordenadas inversas de Leaflet [lat, lng]
+            // Multiplicamos la intensidad según la severidad corregida ('CLASE')
+            let intensidad = 1; 
+            if (feature.properties.CLASE == 1) intensidad = 3;      // Fatal
+            if (feature.properties.CLASE == 2) intensidad = 2;      // No Fatal
+            if (feature.properties.CLASE == 3) intensidad = 1;      // Heridos
+            
+            puntosHeat.push([latlng.lat, latlng.lng, intensidad]);
+
+            return L.circleMarker(latlng, {
+                radius: 5,
+                fillColor: coloresAcc[feature.properties.CLASE],
+                color: '#FFFFFF',
+                weight: 1,
+                fillOpacity: 0.85
+            });
+        },
+        onEachFeature: (feature, layer) => {
+            layer.bindPopup(`<strong>Severidad del Siniestro:</strong><br>${tipoAccidente(feature.properties.CLASE)}`);
+        }
+    });
+
+    // SOLUCIÓN AL BUG DE ELEMENTOS HUÉRFANOS:
+    // Agregamos los sub-elementos de la capa GeoJSON de forma estricta AL CLUSTER, NO AL MAPA GLOBAL.
+    clusterAccidentes.addLayer(capaGeoJsonPuntos);
+    
+    // Seteamos los puntos consolidados a la capa de mapa de calor
+    capaHeatmap.setLatLngs(puntosHeat);
+
+    // Mapeamos los dos contenedores independientes en el árbol de overlays del control de capas
+    overlays["Puntos de Accidentes (Clusters)"] = clusterAccidentes;
+    overlays["Mapa de Calor (Densidad)"] = capaHeatmap;
+
+    // Activamos por defecto el Cluster en el visor
+    clusterAccidentes.addTo(map);
+
+    actualizarControl();
+    ajustarVista();
+});
+
+/* 3. CARGA DE CAPA: RIESGO EN VIALIDADES (LÍNEAS) */
+fetch('./geojson/Riesgo_vialidades_ZMM.geojson')
+.then(r => r.json())
+.then(data => {
+    const capa = L.geoJSON(data, {
+        style: f => ({
+            color: coloresVia[f.properties.Riesgo_via] || '#999',
+            weight: 3,
+            opacity: 0.9
+        }),
+        onEachFeature: (feature, layer) => {
+            layer.bindPopup(`<strong>Clasificación del Eje Vial:</strong><br>Riesgo ${feature.properties.Riesgo_via}`);
+        }
+    });
+
+    overlays["Riesgo de vialidades"] = capa;
+    capa.addTo(map);
+    grupoGeneral.addLayer(capa);
+    actualizarControl();
+    ajustarVista();
+});
+
+/* ESCALA MÉTRICA NATIVA */
+L.control.scale({
+    metric: true,
+    imperial: false
+}).addTo(map);
+
+/* COMPONENTES AUXILIARES PARA EL RENDERIZADO DE LA LEYENDA */
+function crearColor(color, texto) {
+    return `<div class="legend-item"><span class="legend-color" style="background:${color};"></span>${texto}</div>`;
+}
+
+function crearRombo(color, texto) {
+    return `<div class="legend-item"><span class="legend-diamond" style="background:${color};"></span>${texto}</div>`;
+}
+
+function crearLinea(color, texto) {
+    return `
+        <div class="legend-item">
+            <svg class="legend-svg" width="32" height="14">
+                <path d="M1 7 C6 2,12 12,18 7 S24 2,31 7" stroke="${color}" stroke-width="4" fill="none" stroke-linecap="round"/>
+            </svg>
+            ${texto}
+        </div>
+    `;
+}
+
+</script>
+
+</body>
+</html>
