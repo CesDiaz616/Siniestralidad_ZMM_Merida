@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visor de Seguridad Vial - Mérida Metropolitana</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+    
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body, html {
+            height: 100%;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+        #map {
+            width: 100%;
+            height: 100%;
+            background-color: #f5f5f5;
+        }
+        /* Estilos Profesionales para los Popups */
+        .leaflet-popup-content-wrapper {
+            border-radius: 8px;
+            padding: 4px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+        }
+        .leaflet-popup-content {
+            font-size: 13px;
+            line-height: 1.5;
+            color: #333;
+            min-width: 220px;
+        }
+        .leaflet-popup-content strong {
+            font-size: 15px;
+            color: #111;
+            display: block;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 4px;
+        }
+        .alert-card {
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            text-align: center;
+            box-shadow: inset 0 0 0 1px rgba(0,0,0,0.05);
+        }
+        .alert-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            opacity: 0.8;
+        }
+        .alert-value {
+            font-size: 16px;
+            font-weight: 700;
+            margin-top: 2px;
+        }
+        .popup-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 5px;
+        }
+        .popup-table td {
+            padding: 4px 0;
+            border-bottom: 1px dashed #eee;
+        }
+        .popup-table tr:last-child td {
+            border-bottom: none;
+        }
+        .popup-table td.val {
+            text-align: right;
+            font-weight: 600;
+            color: #000;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+
+    <script>
+        // 1. Inicialización del Mapa centrado en la Zona Metropolitana de Mérida
+        const map = L.map('map', {
+            center: [20.975, -89.622],
+            zoom: 12,
+            minZoom: 10,
+            maxZoom: 18
+        });
+
+        // 2. Capas Base (Mapas Base)
+        const mapaClaro = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+        }).addTo(map);
+
+        const satelital = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+        });
+
+        // 3. Paleta de Colores Institucionales para los Niveles de Riesgo
+        const coloresRiesgo = {
+            "Muy Alto": "#D32F2F",  // Rojo oscuro
+            "Alto":     "#F57C00",  // Naranja
+            "Medio":    "#FBC02D",  // Amarillo oscuro
+            "Bajo":     "#388E3C",  // Verde
+            "Muy Bajo": "#1976D2",  // Azul
+            "Sin Riesgo": "#9E9E9E" // Gris
+        };
+
+        // Contenedores para el control de capas
+        const baseMaps = {
+            "Mapa Claro": mapaClaro,
+            "Satélite": satelital
+        };
+
+        const overlays = {};
+        const grupoGeneral = L.layerGroup();
+        
+        // Control de capas vacío que se actualizará dinámicamente
+        let capaControl = L.control.layers(baseMaps, overlays, { collapsed: false }).addTo(map);
+
+        function actualizarControl() {
+            map.removeControl(capaControl);
+            capaControl = L.control.layers(baseMaps, overlays, { collapsed: false }).addTo(map);
+        }
+
+        function formatoNumero(num) {
+            if (num === undefined || num === null) return "0.00";
+            return parseFloat(num).toFixed(2);
+        }
+
+        /* =========================================================================
+           1. CARGA DE CAPA: RIESGO DE ACCIDENTES (POLÍGONOS POR COLONIA)
+           ========================================================================= */
+        fetch('./geojson/Riesgo_accidentes_ZMM.geojson')
+        .then(r => r.json())
+        .then(data => {
+            const capaColonias = L.geoJSON(data, {
+                style: f => ({
+                    color: '#8A8A8A',
+                    weight: 0.8,
+                    fillColor: coloresRiesgo[f.properties.Cat_riesgo] || '#CCC',
+                    fillOpacity: 0.6
+                }),
+                onEachFeature: (feature, layer) => {
+                    const p = feature.properties;
+                    const cat = p.Cat_riesgo ? p.Cat_riesgo.toUpperCase() : "SIN RIESGO";
+                    
+                    // Configuración dinámica de estilos para la tarjeta de alerta del Popup
+                    let estiloAlerta = `background:${coloresRiesgo[p.Cat_riesgo] || '#666'}; color: white; font-weight: 500;`;
+                    if (cat === "BAJO" || cat === "MUY BAJO" || cat === "SIN RIESGO") {
+                        estiloAlerta = `background:${coloresRiesgo[p.Cat_riesgo] || '#F2F2F2'}; color: #000000; font-weight: 700; border: 1px solid #999;`;
+                    }
+
+                    // Popup estructurado exclusivamente con datos alfanuméricos esenciales
+                    layer.bindPopup(`
+                        <strong>${p.nom_asen || 'Colonia / Asentamiento'}</strong>
+                        <div class="alert-card" style="${estiloAlerta}">
+                            <div class="alert-label">Diagnóstico de Riesgo Vial</div>
+                            <div class="alert-value">${cat}</div>
+                        </div>
+                        <table class="popup-table">
+                            <tr>
+                                <td>Índice de Riesgo</td>
+                                <td class="val">${formatoNumero(p.Indice_R)}</td>
+                            </tr>
+                            <tr>
+                                <td>Accidentes Totales</td>
+                                <td class="val">${p.CLASE_coun || 0}</td>
+                            </tr>
+                        </table>
+                    `);
+                }
+            });
+
+            overlays["Riesgo de Accidentes"] = capaColonias;
+            capaColonias.addTo(map);
+            actualizarControl();
+        })
+        .catch(err => console.error("Error cargando Riesgo_accidentes_ZMM.geojson:", err));
+
+        /* =========================================================================
+           2. CARGA DE CAPA: RED VIAL (OPCIONAL / AGREGAR SI EXISTE GEOJSON)
+           ========================================================================= */
+        fetch('./geojson/Red_vial_ZMM.geojson')
+        .then(r => r.json())
+        .then(data => {
+            const capaRedVial = L.geoJSON(data, {
+                style: {
+                    color: '#333333',
+                    weight: 1.2,
+                    opacity: 0.7
+                }
+            });
+            overlays["Red Vial Metropolitana"] = capaRedVial;
+            actualizarControl();
+        })
+        .catch(err => console.warn("Nota: Red_vial_ZMM.geojson no se cargó o no está disponible."));
+
+    </script>
+</body>
+</html>
