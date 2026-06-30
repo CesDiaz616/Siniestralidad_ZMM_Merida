@@ -178,6 +178,26 @@ html, body {
     font-weight: 700;
 }
 
+/* BOTÓN DE CONSULTA REMOTA */
+.btn-consultar {
+    display: block;
+    text-align: center;
+    background: #191738;
+    color: #ffffff !important;
+    text-decoration: none;
+    font-size: 11px;
+    font-weight: bold;
+    padding: 7px 0;
+    margin-top: 10px;
+    border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+    transition: background 0.15s ease-in-out;
+}
+
+.btn-consultar:hover {
+    background: #2b285c;
+}
+
 /* RESPONSIVO */
 @media (max-width: 768px) {
     .map-title {
@@ -190,7 +210,7 @@ html, body {
     .map-title p { font-size: 11px; }
     .leaflet-control-layers { max-width: 220px; max-height: 65vh; }
     .leaflet-popup-content { width: 180px !important; }
-    .metadata-box { display: block; max-width: 85%; } /* Ocultar en móviles para evitar saturar pantalla */
+    .metadata-box { display: block; max-width: 85%; }
 }
 
 </style>
@@ -269,16 +289,16 @@ const coloresVia = {
 };
 
 const coloresAcc = {
-    1: "#D7191C", // Fatal
-    2: "#27AE60", // No Fatal
-    3: "#F1C40F"  // Solo Heridos
+    1: "#D7191C", // Fatal (Rojo)
+    2: "#9B5DE5", // No Fatal (Morado/Púrpura solicitado en DCAH)
+    3: "#27AE60"  // Solo Daños (Verde)
 };
 
 function tipoAccidente(v) {
     return {
         1: "FATAL",
         2: "NO FATAL",
-        3: "HERIDOS"
+        3: "SOLO DAÑOS"
     }[Number(v)] || "SIN CLASIFICAR";
 }
 
@@ -292,7 +312,6 @@ function formatoNumero(v) {
 const overlays = {};
 const grupoGeneral = L.featureGroup().addTo(map);
 
-// Inicializadores de grupos avanzados
 const clusterAccidentes = L.markerClusterGroup({
     spiderfyOnMaxZoom: true,
     showCoverageOnHover: false,
@@ -332,8 +351,8 @@ function insertarLeyenda() {
 
         <div class="legend-title">TIPO DE ACCIDENTES</div>
         ${crearRombo('#D7191C','FATAL')}
-        ${crearRombo('#27AE60','NO FATAL')}
-        ${crearRombo('#F1C40F','HERIDOS')}
+        ${crearRombo('#9B5DE5','NO FATAL')}
+        ${crearRombo('#27AE60','SOLO DAÑOS')}
 
         <div class="legend-title">RIESGO DE ACCIDENTES (COLONIAS)</div>
         ${crearColor('#E8EBA1','MUY BAJO')}
@@ -366,6 +385,9 @@ function ajustarVista() {
     }
 }
 
+/* ID DE LA CARPETA COMPARTIDA EN GOOGLE DRIVE */
+const idCarpetaDrive = "187AMR20IxVh2kH4DQvunFI0zR2yIO88C";
+
 /* 1. CARGA DE CAPA: RIESGO DE ACCIDENTES (POLÍGONOS POR COLONIA) */
 fetch('./geojson/Riesgo_accidentes_ZMM.geojson')
 .then(r => r.json())
@@ -381,11 +403,16 @@ fetch('./geojson/Riesgo_accidentes_ZMM.geojson')
             const p = feature.properties;
             const cat = p.Cat_riesgo ? p.Cat_riesgo.toUpperCase() : "SIN RIESGO";
             
-            // CONTROL DE ACCESIBILIDAD CRÍTICA: Forzar negro y negrita en categorías de bajo contraste
             let estiloAlerta = `background:${coloresRiesgo[p.Cat_riesgo] || '#666'}; color: white; font-weight: 500;`;
             if (cat === "BAJO" || cat === "MUY BAJO" || cat === "SIN RIESGO") {
                 estiloAlerta = `background:${coloresRiesgo[p.Cat_riesgo] || '#F2F2F2'}; color: #000000; font-weight: 700; border: 1px solid #999;`;
             }
+
+            // Nombre del PDF dinámico esperado
+            const nombreArchivoPdf = `Siniestralidad_${p.cve_asen}_${p.nom_asen}.pdf`;
+            
+            // Construcción del enlace dinámico que ejecuta la búsqueda directa del PDF en la carpeta compartida de Google Drive
+            const urlDriveBusqueda = `https://drive.google.com/drive/folders/${idCarpetaDrive}?usp=drive_link&search=${encodeURIComponent(nombreArchivoPdf)}`;
 
             layer.bindPopup(`
                 <strong>${p.nom_asen || 'Colonia sin nombre'}</strong><br><br>
@@ -403,8 +430,8 @@ fetch('./geojson/Riesgo_accidentes_ZMM.geojson')
                         <td class="val">${p.CLASE_coun}</td>
                     </tr>
                 </table>
-                
-                `);
+                <a href="${urlDriveBusqueda}" target="_blank" class="btn-consultar">Consultar</a>
+            `);
         }
     });
 
@@ -415,21 +442,18 @@ fetch('./geojson/Riesgo_accidentes_ZMM.geojson')
     ajustarVista();
 });
 
-/* 2. CARGA DE CAPA: ACCIDENTES (PUNTOS CON CLUSTER Y HEATMAP CONVERTIDO DINÁMICAMENTE) */
+/* 2. CARGA DE CAPA: ACCIDENTES (PUNTOS CON CLUSTER Y HEATMAP) */
 fetch('./geojson/Accidentes_ZMM.geojson')
 .then(r => r.json())
 .then(data => {
-    // Array para almacenar los puntos del Heatmap
     const puntosHeat = [];
 
     const capaGeoJsonPuntos = L.geoJSON(data, {
         pointToLayer: (feature, latlng) => {
-            // Llenamos el array para el mapa de calor usando las coordenadas inversas de Leaflet [lat, lng]
-            // Multiplicamos la intensidad según la severidad corregida ('CLASE')
             let intensidad = 1; 
-            if (feature.properties.CLASE == 1) intensidad = 3;      // Fatal
-            if (feature.properties.CLASE == 2) intensidad = 2;      // No Fatal
-            if (feature.properties.CLASE == 3) intensidad = 1;      // Heridos
+            if (feature.properties.CLASE == 1) intensidad = 3;      
+            if (feature.properties.CLASE == 2) intensidad = 2;      
+            if (feature.properties.CLASE == 3) intensidad = 1;      
             
             puntosHeat.push([latlng.lat, latlng.lng, intensidad]);
 
@@ -446,18 +470,12 @@ fetch('./geojson/Accidentes_ZMM.geojson')
         }
     });
 
-    // SOLUCIÓN AL BUG DE ELEMENTOS HUÉRFANOS:
-    // Agregamos los sub-elementos de la capa GeoJSON de forma estricta AL CLUSTER, NO AL MAPA GLOBAL.
     clusterAccidentes.addLayer(capaGeoJsonPuntos);
-    
-    // Seteamos los puntos consolidados a la capa de mapa de calor
     capaHeatmap.setLatLngs(puntosHeat);
 
-    // Mapeamos los dos contenedores independientes en el árbol de overlays del control de capas
     overlays["Puntos de Accidentes (Clusters)"] = clusterAccidentes;
     overlays["Mapa de Calor (Densidad)"] = capaHeatmap;
 
-    // Activamos por defecto el Cluster en el visor
     clusterAccidentes.addTo(map);
 
     actualizarControl();
