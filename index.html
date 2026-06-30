@@ -409,10 +409,10 @@ fetch('./geojson/Riesgo_accidentes_ZMM.geojson')
             }
 
             // Nombre del PDF dinámico esperado
-            const nombreArchivoPdf = `Siniestralidad_${p.cve_asen}_${p.nom_asen}.pdf`;
+           const nombreArchivoPdf = `Siniestralidad_${p.cve_asen}_${p.nom_asen}.pdf`;
             
             // Construcción del enlace dinámico que ejecuta la búsqueda directa del PDF en la carpeta compartida de Google Drive
-            const urlDriveBusqueda = `https://drive.google.com/drive/folders/${idCarpetaDrive}?usp=drive_link&search=${encodeURIComponent(nombreArchivoPdf)}`;
+          const urlDriveBusqueda = `https://drive.google.com/drive/folders/${idCarpetaDrive}?q=name:${encodeURIComponent(`"${nombreArchivoPdf}"`)}`;
 
             layer.bindPopup(`
                 <strong>${p.nom_asen || 'Colonia sin nombre'}</strong><br><br>
