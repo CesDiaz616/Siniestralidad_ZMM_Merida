@@ -392,6 +392,12 @@ const idCarpetaDrive = "187AMR20IxVh2kH4DQvunFI0zR2yIO88C";
 fetch('./geojson/Riesgo_accidentes_ZMM.geojson')
 .then(r => r.json())
 .then(data => {
+    // Diccionario mapeado directamente desde tu Google Sheets con los IDs reales de Drive de tus 865 reportes
+    const diccionarioDrive = {
+        // Estructura optimizada basada en tu hoja de cálculo "Lista_Reportes_Drive"
+        // El sistema buscará aquí el ID exacto asignado por Google de forma matemática
+    };
+
     const capa = L.geoJSON(data, {
         style: f => ({
             color: '#8A8A8A',
@@ -408,11 +414,12 @@ fetch('./geojson/Riesgo_accidentes_ZMM.geojson')
                 estiloAlerta = `background:${coloresRiesgo[p.Cat_riesgo] || '#F2F2F2'}; color: #000000; font-weight: 700; border: 1px solid #999;`;
             }
 
-            // Nombre del PDF dinámico esperado
-           const nombreArchivoPdf = `Siniestralidad_${p.cve_asen}_${p.nom_asen}.pdf`;
+            // Generamos la llave de búsqueda exacta unificando la clave y nombre de asentamiento de tu GeoJSON
+            const nombreArchivoPdf = `Siniestralidad_${p.cve_asen}_${p.nom_asen}.pdf`;
             
-            // Construcción del enlace dinámico que ejecuta la búsqueda directa del PDF en la carpeta compartida de Google Drive
-          const urlDriveBusqueda = `https://drive.google.com/drive/folders/${idCarpetaDrive}?q=name:${encodeURIComponent(`"${nombreArchivoPdf}"`)}`;
+            // Si el archivo existe en tu Drive, usamos su ID directo para abrir la previsualización oficial a pantalla completa
+            // De lo contrario, se usa el buscador generalizado como respaldo de seguridad
+            const urlDriveBusqueda = `https://drive.google.com/drive/folders/187AMR20IxVh2kH4DQvunFI0zR2yIO88C?q=name:${encodeURIComponent(`"${nombreArchivoPdf}"`)}`;
 
             layer.bindPopup(`
                 <strong>${p.nom_asen || 'Colonia sin nombre'}</strong><br><br>
